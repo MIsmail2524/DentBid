@@ -26,7 +26,7 @@ DAMAGE_LABELS: dict[str, str] = {
 # is inherently more serious regardless of size.
 CLASS_BASE_SEVERITY: dict[str, float] = {
     "scratch": 0.15,
-    "dent": 0.15,
+    "dent": 0.10,
     "crack": 0.55,
     "lamp_broken": 0.60,
     "glass_shatter": 0.75,

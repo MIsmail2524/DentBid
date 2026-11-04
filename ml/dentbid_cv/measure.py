@@ -78,31 +78,3 @@ def paint_layer_from_contrast(delta_e: float) -> str:
     if delta_e < 18.0:
         return "base_coat"
     return "primer_or_metal"
-
-
-def dent_depth_index(image_bgr: np.ndarray, mask: np.ndarray) -> float:
-    """0-1 proxy for how deep a dent is.
-
-    A dent bends the panel, which distorts reflections: inside the mask the
-    shading gradient becomes much stronger and less uniform than on the flat
-    paint around it. We compare gradient energy inside vs. a ring around the
-    dent and squash the ratio into 0-1. This is a relative visual cue, not a
-    millimetre depth; the thresholds in severity.py turn it into grades.
-    """
-    m = mask.astype(bool)
-    if m.sum() < 25:
-        return 0.0
-    gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY).astype(np.float32)
-    gray = cv2.GaussianBlur(gray, (5, 5), 0)
-    gx = cv2.Sobel(gray, cv2.CV_32F, 1, 0, ksize=3)
-    gy = cv2.Sobel(gray, cv2.CV_32F, 0, 1, ksize=3)
-    mag = np.sqrt(gx * gx + gy * gy)
-
-    ring = _ring(m, width=max(5, int(np.sqrt(m.sum()) * 0.25)))
-    inner = float(mag[m].mean())
-    outer = float(mag[ring].mean()) if ring.any() else 1.0
-    spread = float(gray[m].std() / (gray[ring].std() + 1.0)) if ring.any() else 1.0
-
-    ratio = 0.6 * (inner / (outer + 1.0)) + 0.4 * spread
-    # ratio ~1 means "looks like the surrounding paint"; ~4+ is a strong crease.
-    return float(np.clip((ratio - 1.0) / 3.0, 0.0, 1.0))

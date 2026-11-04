@@ -2,7 +2,9 @@
 
 The rules mirror how body shops assess damage:
   * scratches: depth (which paint layer is exposed) matters more than length
-  * dents: size and sharpness/depth decide paintless repair vs. filler + paint
+  * dents: size decides paintless repair vs. filler + paint. Depth is not estimated:
+    shading cues tested on 71 real CarDD dents did no better than chance, so the
+    workshop judges depth from the photos.
   * cracks, broken glass and lamps: almost always replacement
 """
 
@@ -30,8 +32,12 @@ def _size_factor(m: Measurements) -> float:
     if m.area_cm2 is not None:
         # <=5 cm2 ~ 0, 36 cm2 (6x6) ~ 0.38, 400 cm2 (20x20) ~ 0.84, >=900 cm2 (30x30) ~ 1.0
         return float(min(1.0, max(0.0, math.log10(max(m.area_cm2, 1.0) / 5.0) / math.log10(180.0))))
-    ratio = m.area_ratio_part if m.area_ratio_part is not None else (m.area_ratio_car or 0.0)
-    return float(min(1.0, math.sqrt(ratio / 0.35)))
+    if m.area_ratio_part is not None:
+        return float(min(1.0, math.sqrt(m.area_ratio_part / 0.35)))
+    if m.area_ratio_car is not None:
+        return float(min(1.0, math.sqrt(m.area_ratio_car / 0.20)))
+    # no car or part found: damage photos are usually close-ups of one panel
+    return float(min(1.0, math.sqrt(m.area_ratio_image / 0.15)))
 
 
 def score_damage(damage_type: str, m: Measurements, confidence: float) -> float:
@@ -43,12 +49,13 @@ def score_damage(damage_type: str, m: Measurements, confidence: float) -> float:
         length = min(1.0, (m.length_cm or 0.0) / 60.0) if m.length_cm is not None else size
         raw = base + 0.40 * layer_w + 0.30 * length + 0.15 * size
     elif damage_type == "dent":
-        depth = m.depth_index or 0.0
-        raw = base + 0.40 * size + 0.35 * depth
+        raw = base + 0.60 * size
     elif damage_type == "crack":
         length = min(1.0, (m.length_cm or 0.0) / 40.0) if m.length_cm is not None else size
         raw = base + 0.30 * length + 0.15 * size
-    else:  # glass_shatter, lamp_broken, tire_flat
+    elif damage_type == "tire_flat":
+        raw = base  # a tyre is always a whole tyre: its pixel size says nothing about severity
+    else:  # glass_shatter, lamp_broken
         raw = base + 0.35 * size
 
     # Low-confidence detections are pulled toward the middle rather than
@@ -74,8 +81,8 @@ def recommend(damage_type: str, part: str | None, m: Measurements, severity: str
             if severity == "severe":
                 return ("replace_part", "Deformed plastic part; replacement usually cheaper than repair.", [1.5, 4.0])
             return ("plastic_reshape", "Plastic dent; heat reshape, then refinish if paint cracked.", [1.5, 4.0])
-        if severity == "minor" and (m.depth_index or 0) < 0.45:
-            return ("pdr", "Shallow dent with intact paint; paintless dent repair (PDR).", [0.5, 2.0])
+        if severity == "minor":
+            return ("pdr", "Small dent; paintless dent repair (PDR) if the paint is intact.", [0.5, 2.0])
         if severity == "moderate":
             return ("dent_repair_repaint", "Pull dent, apply filler, prime and repaint.", [3.0, 7.0])
         return ("panel_replace_or_major", "Large/deep dent or creased panel; major repair or panel replacement.", [6.0, 14.0])

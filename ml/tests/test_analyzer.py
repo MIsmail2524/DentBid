@@ -78,21 +78,23 @@ def test_light_scratch_is_minor_polish():
     assert d.severity == "minor"
 
 
-def test_dent_severity_grows_with_size_and_depth():
-    flat = car_image()
-    small = analyze_predictions(flat, [seg("dent", rect_mask(500, 350, 530, 380))], [door()]).damages[0]
-
-    creased = car_image()
-    # strong shading gradient inside the dent region simulates a deep crease
-    for i in range(200):
-        cv2.line(creased, (450 + i, 300), (450 + i, 500), (int(40 + 200 * (i % 40) / 40),) * 3, 1)
-    big = analyze_predictions(creased, [seg("dent", rect_mask(450, 300, 650, 500))], [door()]).damages[0]
-
+def test_dent_severity_grows_with_size():
+    img = car_image()
+    small = analyze_predictions(img, [seg("dent", rect_mask(500, 350, 530, 380))], [door()]).damages[0]  # ~6x6 cm
+    big = analyze_predictions(img, [seg("dent", rect_mask(450, 300, 650, 500))], [door()]).damages[0]    # ~40x40 cm
     assert big.measurements.area_cm2 > small.measurements.area_cm2
-    assert big.measurements.depth_index > small.measurements.depth_index
     assert big.severity_score > small.severity_score
-    assert small.repair_method == "pdr"
-    assert big.severity != "minor"
+    assert small.severity == "minor" and small.repair_method == "pdr"
+    assert big.severity == "severe"
+
+
+def test_size_falls_back_to_photo_share_without_scale():
+    img = car_image()
+    tiny = analyze_predictions(img, [seg("dent", rect_mask(500, 350, 520, 370))]).damages[0]
+    large = analyze_predictions(img, [seg("dent", rect_mask(400, 250, 600, 450))]).damages[0]   # 4% of photo
+    assert tiny.measurements.width_cm is None
+    assert large.measurements.area_ratio_image == pytest.approx(0.0434, abs=0.001)
+    assert tiny.severity == "minor" and large.severity in ("moderate", "severe")
 
 
 def test_duplicate_masks_removed_and_report_merges_parts():

@@ -11,7 +11,6 @@ Detects car body damage in photos, measures it and grades severity so workshops 
 | `width_cm`, `height_cm`, `area_cm2` | size estimate, scaled from the known size of the detected part |
 | `length_cm`, `mean_width_cm` | scratches/cracks: centre-line length and average width |
 | `paint_layer` | scratches: `clear_coat` / `base_coat` / `primer_or_metal` (from LAB colour contrast with surrounding paint) |
-| `depth_index` | dents: 0-1 depth cue from reflection/shading distortion |
 | `severity_score`, `severity` | 0-100 score; minor < 35 <= moderate < 65 <= severe |
 | `repair_method` | polish, touch_up, panel_repaint, pdr, dent_repair_repaint, plastic_reshape, replace_part ... |
 | `labor_hours` | rough labour range for workshop reference |
@@ -25,10 +24,26 @@ photo ─┬─ quality check
        ├─ damage model (YOLO11-seg) ── masks per damage
        ├─ parts model  (YOLO11-seg) ── which panel + cm/px scale
        └─ COCO model   (optional)   ── car outline fallback for scale
-            └─ measure (skeleton length, LAB contrast, gradient depth) → grade → repair rule
+            └─ measure (size, skeleton length, LAB paint contrast) → grade → repair rule
 ```
 
-## Train (GPU: Colab or Kaggle)
+## Train on a GPU server (SSH)
+
+```bash
+git clone https://github.com/MIsmail2524/DentBid.git && cd DentBid/ml
+tmux new -s train
+bash scripts/gpu_train.sh          # MODEL=yolo11l-seg.pt for a bigger damage model
+scp user@gpu:DentBid/ml/weights/{damage,parts}.pt ml/weights/    # run this on the app machine
+```
+
+The script:
+1. downloads the CarDD mirror from Hugging Face (`harpreetsahota/CarDD`, 2.2 GB);
+2. converts the masks to YOLO polygons and splits the data 80/12/8;
+3. trains and evaluates the damage model, then trains the car-parts model.
+
+CarDD is licensed for research and non-commercial use. Check `datasets/damage/CarDD_license.pdf` before any commercial use.
+
+## Train on Colab or Kaggle
 
 Open [notebooks/train_colab.ipynb](notebooks/train_colab.ipynb) in Colab, or run these steps:
 
@@ -56,8 +71,13 @@ print(result.overall_severity, result.summary)
 
 ## Accuracy notes
 
+These were checked on real CarDD photos, using the dataset's true damage outlines in place of the model's:
+
+- **Dent depth is not estimated.** Two shading-based depth cues scored no better than chance on 71 real dents (AUC 0.41 and 0.48), so dents are graded by size and the workshop judges depth from the photos.
+- **Without a cm scale, size comes from the share of the photo** the damage covers (damage photos are usually close-ups of one panel).
+- **A flat tyre's grade does not depend on how big the tyre looks** in the photo.
 - Size in cm is an estimate based on average part sizes. Close-ups without a recognisable part fall back to the whole car, or report no cm value (`scale_unavailable`).
-- `depth_index` and `paint_layer` are visual cues. Workshops should confirm them during inspection.
+- `paint_layer` is a visual cue, and dark marks such as tyre rubber can look like exposed primer. Workshops should confirm it during inspection.
 - Low-confidence detections stay in the report with a reduced score instead of being dropped.
 
 ## Tests

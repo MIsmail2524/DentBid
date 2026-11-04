@@ -22,12 +22,12 @@ class Measurements:
     area_px: int
     area_ratio_part: float | None     # share of the damaged part covered
     area_ratio_car: float | None      # share of the visible car covered
+    area_ratio_image: float           # share of the photo covered (fallback when no car/part found)
     width_cm: float | None            # bounding box size, estimated
     height_cm: float | None
     area_cm2: float | None
     length_cm: float | None           # scratches/cracks: skeleton length
     mean_width_cm: float | None       # scratches/cracks: area / length
-    depth_index: float | None         # dents: 0-1 shading-distortion proxy for depth
     paint_contrast: float | None      # scratches: CIEDE2000-like LAB distance to surroundings
     paint_layer: str | None           # scratches: clear_coat | base_coat | primer_or_metal
     scale_source: str | None          # which reference gave the cm/px scale

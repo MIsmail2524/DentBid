@@ -175,7 +175,7 @@ def analyze_predictions(image_bgr: np.ndarray, damage_segs: list[Segment],
             height_cm = round((y2 - y1) * cm_px, 1)
             area_cm2 = round(area_px * cm_px * cm_px, 1)
 
-        depth_index = contrast = None
+        contrast = None
         layer = None
         if seg.name in ("scratch", "crack"):
             length_px = measure.skeleton_length_px(dmask)
@@ -188,16 +188,15 @@ def analyze_predictions(image_bgr: np.ndarray, damage_segs: list[Segment],
         if seg.name == "scratch":
             contrast = round(measure.paint_contrast(image_bgr, dmask), 2)
             layer = measure.paint_layer_from_contrast(contrast)
-        if seg.name == "dent":
-            depth_index = round(measure.dent_depth_index(image_bgr, dmask), 3)
 
         m = Measurements(
             area_px=area_px,
             area_ratio_part=round(area_px / max(int(part.mask.sum()), 1), 4) if part is not None else None,
             area_ratio_car=round(area_px / car_area, 4) if car_area else None,
+            area_ratio_image=round(area_px / float(h * w), 4),
             width_cm=width_cm, height_cm=height_cm, area_cm2=area_cm2,
             length_cm=length_cm, mean_width_cm=mean_width_cm,
-            depth_index=depth_index, paint_contrast=contrast, paint_layer=layer,
+            paint_contrast=contrast, paint_layer=layer,
             scale_source=scale_src,
         )
         score = severity.score_damage(seg.name, m, seg.confidence)
