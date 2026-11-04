@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dentbid-cv"
+version = "0.1.0"
+description = "DentBid computer vision engine: car damage detection, measurement and severity grading"
+authors = [{ name = "MIsmail2524" }]
+license = { text = "MIT" }
+requires-python = ">=3.10"
+dependencies = [
+  "numpy>=1.26",
+  "opencv-python-headless>=4.9",
+  "scikit-image>=0.22",
+]
+
+[project.optional-dependencies]
+yolo = ["ultralytics>=8.3"]
+dev = ["pytest>=8"]
+
+[tool.setuptools.packages.find]
+include = ["dentbid_cv*"]

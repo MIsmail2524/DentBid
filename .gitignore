@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Env / secrets
+.env
+*.env.local
+
+# Data / models / media
+ml/datasets/
+ml/runs/
+ml/weights/*.pt
+ml/weights/*.onnx
+backend/media/
+*.db
+
+# Node / Expo
+node_modules/
+.expo/
+dist/
+web-build/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# OS / IDE
+.DS_Store
+.vscode/
+.idea/
