@@ -1,0 +1,75 @@
+{
+  "expo": {
+    "name": "DentBid",
+    "slug": "dentbid",
+    "scheme": "dentbid",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.mismail2524.dentbid"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0B3D91",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "com.mismail2524.dentbid"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro",
+      "output": "single",
+      "name": "DentBid"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-localization",
+        {
+          "supportsRTL": true,
+          "forcesRTL": false,
+          "supportedLocales": [
+            "en",
+            "ur",
+            "ar",
+            "hi",
+            "es"
+          ]
+        }
+      ],
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "DentBid needs your photos to analyse car damage.",
+          "cameraPermission": "DentBid uses the camera to photograph car damage.",
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "DentBid uses your location to find nearby workshops and set your currency and language."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#0B3D91"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": false
+    },
+    "extra": {
+      "apiUrl": "http://localhost:8000"
+    }
+  }
+}

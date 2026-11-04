@@ -17,6 +17,8 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if settings.jwt_secret == "dev-secret-change-me":
+        logging.getLogger("dentbid").warning("JWT_SECRET is the development default. Set a long random value in production.")
     Base.metadata.create_all(engine)
     yield
 
