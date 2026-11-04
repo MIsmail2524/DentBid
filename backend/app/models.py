@@ -32,6 +32,13 @@ class RequestStatus(str, enum.Enum):
     expired = "expired"
 
 
+class VerificationStatus(str, enum.Enum):
+    pending = "pending"         # submitted, waiting for an admin
+    approved = "approved"       # can see jobs and quote
+    rejected = "rejected"       # admin asked for changes (see rejection_reason)
+    suspended = "suspended"     # blocked by an admin after approval
+
+
 class QuoteStatus(str, enum.Enum):
     pending = "pending"         # waiting for customer
     countered = "countered"     # customer proposed another price, waiting for workshop
@@ -53,9 +60,13 @@ class User(Base):
     currency: Mapped[str | None] = mapped_column(String(3))
     language: Mapped[str | None] = mapped_column(String(8))
     push_token: Mapped[str | None] = mapped_column(String(255))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # bumped to revoke every token issued before (deactivation, logout everywhere)
+    token_version: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
-    workshop: Mapped[Workshop | None] = relationship(back_populates="owner", uselist=False)
+    workshop: Mapped[Workshop | None] = relationship(back_populates="owner", uselist=False,
+                                                     foreign_keys="Workshop.owner_id")
 
 
 class Workshop(Base):
@@ -75,12 +86,48 @@ class Workshop(Base):
     services: Mapped[list] = mapped_column(JSON, default=list)
     about: Mapped[str | None] = mapped_column(Text)
     verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    verification_status: Mapped[VerificationStatus] = mapped_column(
+        Enum(VerificationStatus, native_enum=False), default=VerificationStatus.pending, index=True)
+    rejection_reason: Mapped[str | None] = mapped_column(Text)
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    verified_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     rating_avg: Mapped[float] = mapped_column(Float, default=0.0)
     rating_count: Mapped[int] = mapped_column(Integer, default=0)
     jobs_completed: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
-    owner: Mapped[User] = relationship(back_populates="workshop")
+    owner: Mapped[User] = relationship(back_populates="workshop", foreign_keys=[owner_id])
+    documents: Mapped[list[WorkshopDocument]] = relationship(back_populates="workshop", cascade="all, delete-orphan",
+                                                             order_by="WorkshopDocument.id")
+
+    def set_status(self, status: VerificationStatus) -> None:
+        self.verification_status = status
+        self.verified = status == VerificationStatus.approved
+
+
+class WorkshopDocument(Base):
+    """Verification evidence (shop front, trade licence ...). Stored outside the public media folder."""
+    __tablename__ = "workshop_documents"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workshop_id: Mapped[int] = mapped_column(ForeignKey("workshops.id"), index=True)
+    kind: Mapped[str] = mapped_column(String(32))
+    path: Mapped[str] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    workshop: Mapped[Workshop] = relationship(back_populates="documents")
+
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    actor_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    action: Mapped[str] = mapped_column(String(64))
+    target_type: Mapped[str] = mapped_column(String(32))
+    target_id: Mapped[int] = mapped_column(Integer)
+    details: Mapped[dict | None] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
 
 
 class DamageRequest(Base):

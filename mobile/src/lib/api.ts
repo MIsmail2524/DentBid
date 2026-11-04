@@ -2,10 +2,12 @@ import { Platform } from 'react-native';
 
 import { API_URL } from './config';
 import type {
-  DamageRequest, LocaleInfo, Message, Quote, RequestCard, User, Workshop,
+  AdminStats, AdminUser, AdminWorkshop, DamageRequest, LocaleInfo, Message, Quote, RequestCard, User,
+  VerificationStatus, Workshop, WorkshopDocument,
 } from './types';
 
 let authToken: string | null = null;
+export const getAuthToken = () => authToken;
 export function setAuthToken(token: string | null) {
   authToken = token;
 }
@@ -88,8 +90,39 @@ export const api = {
     patch<User>('/auth/me', body),
 
   myWorkshop: () => get<Workshop>('/workshops/me'),
-  saveWorkshop: (body: Omit<Workshop, 'id' | 'verified' | 'rating_avg' | 'rating_count' | 'jobs_completed' | 'distance_km'>) =>
-    put<Workshop>('/workshops/me', body),
+  saveWorkshop: (body: Omit<Workshop, 'id' | 'verified' | 'verification_status' | 'rejection_reason' | 'rating_avg'
+    | 'rating_count' | 'jobs_completed' | 'distance_km'>) => put<Workshop>('/workshops/me', body),
+  myDocuments: () => get<WorkshopDocument[]>('/workshops/me/documents'),
+  uploadDocument: async (kind: string, photo: { uri: string; mimeType?: string | null; fileName?: string | null; file?: File }) => {
+    const fd = new FormData();
+    fd.append('kind', kind);
+    const name = photo.fileName ?? `${kind}.jpg`;
+    if (Platform.OS === 'web') {
+      fd.append('file', photo.file ?? (await (await fetch(photo.uri)).blob()), name);
+    } else {
+      fd.append('file', { uri: photo.uri, name, type: photo.mimeType ?? 'image/jpeg' } as unknown as Blob);
+    }
+    return request<WorkshopDocument>('/workshops/me/documents', { method: 'POST', body: fd });
+  },
+  deleteDocument: (id: number) => request<void>(`/workshops/me/documents/${id}`, { method: 'DELETE' }),
+  logoutAll: () => post<void>('/auth/logout-all'),
+
+  admin: {
+    stats: () => get<AdminStats>('/admin/stats'),
+    workshops: (status?: VerificationStatus | '', q?: string) => {
+      const p = new URLSearchParams();
+      if (status) p.set('status', status);
+      if (q) p.set('q', q);
+      return get<AdminWorkshop[]>(`/admin/workshops?${p}`);
+    },
+    workshop: (id: number) => get<AdminWorkshop>(`/admin/workshops/${id}`),
+    approve: (id: number) => post<AdminWorkshop>(`/admin/workshops/${id}/approve`),
+    reject: (id: number, reason: string) => post<AdminWorkshop>(`/admin/workshops/${id}/reject`, { reason }),
+    suspend: (id: number, reason: string) => post<AdminWorkshop>(`/admin/workshops/${id}/suspend`, { reason }),
+    users: (q?: string) => get<AdminUser[]>(`/admin/users${q ? `?q=${encodeURIComponent(q)}` : ''}`),
+    deactivate: (id: number, reason: string) => post<AdminUser>(`/admin/users/${id}/deactivate`, { reason }),
+    activate: (id: number) => post<AdminUser>(`/admin/users/${id}/activate`),
+  },
 
   createRequest: async (input: NewRequestInput) => {
     const fd = new FormData();

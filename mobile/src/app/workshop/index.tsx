@@ -1,12 +1,14 @@
-import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { FlatList, RefreshControl, ScrollView } from 'react-native';
 
 import { RequestCardView } from '../../components/RequestCardView';
 import { useTheme } from '../../components/theme';
-import { Chip, Empty, ErrorText, Loading, Row } from '../../components/ui';
+import { Chip, Empty, ErrorText, Loading, Row, Screen } from '../../components/ui';
+import { VerificationBanner } from '../../components/Verification';
 import { useLocale } from '../../i18n';
 import { api } from '../../lib/api';
+import { useAuth } from '../../lib/auth';
 import { useRealtime } from '../../lib/realtime';
 import { useLoader } from '../../lib/useLoader';
 
@@ -19,8 +21,16 @@ export default function Feed() {
   const router = useRouter();
   const [severity, setSeverity] = useState<(typeof SEVERITIES)[number]>('');
   const [sort, setSort] = useState<(typeof SORTS)[number]>('distance');
-  const { data, error, refreshing, reload } = useLoader(() => api.feed({ severity, sort }));
+  const { user, refresh } = useAuth();
+  const approved = user?.workshop_status === 'approved';
+  const { data, error, refreshing, reload } = useLoader(() => (approved ? api.feed({ severity, sort }) : Promise.resolve([])));
+  const [reason, setReason] = useState<string | null>(null);
+  useFocusEffect(useCallback(() => {
+    refresh().catch(() => undefined);
+    if (!approved) api.myWorkshop().then((w) => setReason(w.rejection_reason)).catch(() => undefined);
+  }, [approved, refresh]));
   useRealtime((e) => {
+    if (e.type === 'workshop.verification') refresh().catch(() => undefined);
     if (e.type.startsWith('request.') || e.type.startsWith('quote.')) reload();
   });
 
@@ -29,6 +39,9 @@ export default function Feed() {
     setTimeout(reload, 0);
   };
 
+  if (!approved) {
+    return <Screen><VerificationBanner status={user?.workshop_status ?? 'pending'} reason={reason} /></Screen>;
+  }
   if (!data && !error) return <Loading />;
   return (
     <FlatList

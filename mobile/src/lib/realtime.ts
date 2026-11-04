@@ -14,10 +14,13 @@ let pinger: ReturnType<typeof setInterval> | null = null;
 
 function open() {
   if (!currentToken) return;
-  const ws = new WebSocket(`${WS_URL}/ws?token=${encodeURIComponent(currentToken)}`);
+  const token = currentToken;
+  const ws = new WebSocket(`${WS_URL}/ws`);
   socket = ws;
   ws.onopen = () => {
     retry = 0;
+    // authenticate with the first frame so the token never lands in URLs or logs
+    ws.send(JSON.stringify({ token }));
     pinger = setInterval(() => ws.readyState === 1 && ws.send('ping'), 25000);
   };
   ws.onmessage = (m) => {

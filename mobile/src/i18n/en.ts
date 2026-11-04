@@ -95,7 +95,6 @@ const en = {
   size: 'Size',
   length: 'Length',
   area: 'Area',
-  depth: 'Depth',
   paint_layer: 'Paint layer',
   layer_clear_coat: 'Clear coat only',
   layer_base_coat: 'Colour coat',
@@ -110,9 +109,6 @@ const en = {
   issue_overexposed: 'overexposed',
   issue_strong_glare: 'glary',
   issue_low_resolution: 'low resolution',
-  depth_shallow: 'Shallow',
-  depth_medium: 'Medium',
-  depth_deep: 'Deep',
   // quotes (customer)
   quotes: 'Quotes',
   no_quotes_yet: 'No quotes yet. Nearby workshops have been notified.',
@@ -184,6 +180,20 @@ const en = {
   src_accept_language: 'device settings',
   src_default: 'default settings',
   edit_workshop: 'Edit workshop profile',
+  tab_admin_queue: 'Verification',
+  tab_admin_workshops: 'Workshops',
+  tab_admin_users: 'Users',
+  verify_pending_title: 'Waiting for verification',
+  verify_pending_body: 'Our team is checking your workshop. Upload a shop-front photo and your trade licence to speed this up. You will be notified when you are approved.',
+  verify_rejected_title: 'Verification needs changes',
+  verify_suspended_title: 'Workshop suspended',
+  documents: 'Verification documents',
+  documents_hint: 'Photos are only visible to you and the DentBid team.',
+  doc_shop_front: 'Shop front',
+  doc_trade_license: 'Trade licence',
+  doc_owner_id: 'Owner ID',
+  doc_other: 'Other',
+  upload_document: 'Upload photo',
 };
 
 export type Strings = typeof en;

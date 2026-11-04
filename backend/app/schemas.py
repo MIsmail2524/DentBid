@@ -22,13 +22,13 @@ class RegisterIn(BaseModel):
     password: str = Field(min_length=8, max_length=128)
     phone: str | None = Field(default=None, max_length=32)
     role: Literal["customer", "workshop"] = "customer"
-    country_code: str | None = Field(default=None, min_length=2, max_length=2)
-    language: str | None = None
+    country_code: str | None = Field(default=None, min_length=2, max_length=2, pattern="^[A-Za-z]{2}$")
+    language: str | None = Field(default=None, max_length=8)
 
 
 class LoginIn(BaseModel):
     email: EmailStr
-    password: str
+    password: str = Field(max_length=128)
 
 
 class UserOut(ORM):
@@ -41,6 +41,7 @@ class UserOut(ORM):
     currency: str | None
     language: str | None
     has_workshop: bool = False
+    workshop_status: str | None = None
 
 
 class TokenOut(BaseModel):
@@ -52,19 +53,19 @@ class TokenOut(BaseModel):
 class UserUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=2, max_length=120)
     phone: str | None = Field(default=None, max_length=32)
-    country_code: str | None = Field(default=None, min_length=2, max_length=2)
-    currency: str | None = Field(default=None, min_length=3, max_length=3)
-    language: str | None = None
-    push_token: str | None = None
+    country_code: str | None = Field(default=None, min_length=2, max_length=2, pattern="^[A-Za-z]{2}$")
+    currency: str | None = Field(default=None, min_length=3, max_length=3, pattern="^[A-Za-z]{3}$")
+    language: str | None = Field(default=None, max_length=8)
+    push_token: str | None = Field(default=None, max_length=255)
 
 
 # ---------- workshops ----------
 class WorkshopIn(BaseModel):
     name: str = Field(min_length=2, max_length=160)
-    phone: str | None = None
-    address: str | None = None
-    city: str | None = None
-    country_code: str | None = Field(default=None, min_length=2, max_length=2)
+    phone: str | None = Field(default=None, max_length=32)
+    address: str | None = Field(default=None, max_length=255)
+    city: str | None = Field(default=None, max_length=80)
+    country_code: str | None = Field(default=None, min_length=2, max_length=2, pattern="^[A-Za-z]{2}$")
     lat: float = Field(ge=-90, le=90)
     lng: float = Field(ge=-180, le=180)
     service_radius_km: float = Field(default=25, gt=0, le=200)
@@ -85,10 +86,19 @@ class WorkshopOut(ORM):
     services: list[str]
     about: str | None
     verified: bool
+    verification_status: str
+    rejection_reason: str | None
     rating_avg: float
     rating_count: int
     jobs_completed: int
     distance_km: float | None = None
+
+
+class DocumentOut(BaseModel):
+    id: int
+    kind: str
+    url: str
+    created_at: datetime
 
 
 class WorkshopPublic(ORM):
@@ -227,6 +237,43 @@ class ReviewOut(ORM):
     workshop_id: int
     rating: int
     comment: str | None
+    created_at: datetime
+
+
+class ReasonIn(BaseModel):
+    reason: str = Field(min_length=3, max_length=500)
+
+
+class AdminWorkshopOut(WorkshopOut):
+    owner_id: int
+    owner_name: str
+    owner_email: str
+    owner_phone: str | None
+    owner_active: bool
+    document_count: int
+    created_at: datetime
+    verified_at: datetime | None
+    documents: list[DocumentOut] = []
+
+
+class AdminUserOut(ORM):
+    id: int
+    role: Role
+    name: str
+    email: str
+    phone: str | None
+    country_code: str | None
+    is_active: bool
+    created_at: datetime
+
+
+class AuditOut(ORM):
+    id: int
+    actor_id: int
+    action: str
+    target_type: str
+    target_id: int
+    details: dict | None
     created_at: datetime
 
 

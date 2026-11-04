@@ -1,6 +1,7 @@
 import { Image, View } from 'react-native';
 
 import { TKey, useLocale } from '../i18n';
+import { absoluteUrl } from '../lib/config';
 import type { RequestCard, RequestStatus } from '../lib/types';
 import { Theme, useTheme } from './theme';
 import { Badge, Card, H2, P, Row, SeverityBadge } from './ui';
@@ -21,7 +22,7 @@ export function RequestCardView({ card, onPress, workshop }: { card: RequestCard
   return (
     <Card onPress={onPress} style={{ flexDirection: 'row', gap: 12 }}>
       {card.thumbnail_url ? (
-        <Image source={{ uri: card.thumbnail_url }} style={{ width: 92, height: 92, borderRadius: 10, backgroundColor: t.chip }} />
+        <Image source={{ uri: absoluteUrl(card.thumbnail_url) ?? '' }} style={{ width: 92, height: 92, borderRadius: 10, backgroundColor: t.chip }} />
       ) : (
         <View style={{ width: 92, height: 92, borderRadius: 10, backgroundColor: t.chip }} />
       )}

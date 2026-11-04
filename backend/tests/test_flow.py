@@ -4,7 +4,7 @@ import pytest
 from app.services import analysis
 from dentbid_cv.analyzer import Segment, analyze_predictions
 
-from .conftest import jpeg_bytes, register
+from .conftest import admin_headers, jpeg_bytes, register
 
 KARACHI = (24.8607, 67.0011)
 
@@ -32,12 +32,16 @@ def fake_model(monkeypatch):
     monkeypatch.setattr(analysis, "get_analyzer", lambda: FakeAnalyzer())
 
 
-def make_workshop(client, email, lat, lng, services=None):
+def make_workshop(client, email, lat, lng, services=None, approve=True):
     h, _ = register(client, email, role="workshop")
     r = client.put("/api/workshops/me", headers=h, json={
         "name": f"Shop {email[:4]}", "lat": lat, "lng": lng, "city": "Karachi",
         "service_radius_km": 20, "services": services or [], "phone": "+92211111111"})
     assert r.status_code == 200, r.text
+    assert r.json()["verification_status"] == "pending"
+    if approve:
+        a = client.post(f"/api/admin/workshops/{r.json()['id']}/approve", headers=admin_headers(client))
+        assert a.status_code == 200, a.text
     return h
 
 
@@ -87,7 +91,7 @@ def test_full_bidding_flow(client, fake_model):
     assert detail["analysis"]["status"] == "done"
     assert detail["analysis"]["damage_types"] == ["dent"]
     assert detail["overall_severity"] in ("minor", "moderate", "severe")
-    assert detail["photos"][0]["annotated_url"].endswith("_annotated.jpg")
+    assert "_annotated.jpg?exp=" in detail["photos"][0]["annotated_url"]
     dmg = detail["photos"][0]["analysis"]["damages"][0]
     assert dmg["part"] == "front_door" and dmg["measurements"]["width_cm"] > 0
 

@@ -28,6 +28,7 @@ function Root() {
         <Stack.Screen name="welcome" options={{ headerShown: false }} />
         <Stack.Screen name="customer" options={{ headerShown: false }} />
         <Stack.Screen name="workshop" options={{ headerShown: false }} />
+        <Stack.Screen name="admin" options={{ headerShown: false }} />
       </Stack>
     </View>
   );

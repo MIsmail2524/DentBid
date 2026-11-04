@@ -6,8 +6,8 @@ from sqlalchemy.orm import Session
 
 from ..config import get_settings
 from ..db import get_db
-from ..deps import get_current_user, require_customer, require_workshop
-from ..models import DamagePhoto, DamageRequest, QuoteStatus, RequestStatus, Review, Role, User, Workshop
+from ..deps import get_current_user, require_customer, require_verified_workshop, require_workshop
+from ..models import DamagePhoto, DamageRequest, QuoteStatus, RequestStatus, Review, Role, User, VerificationStatus, Workshop
 from ..schemas import CounterIn, RequestCard, RequestOut, ReviewIn, ReviewOut, StatusIn
 from ..serializers import refresh_expiry, request_card, request_out
 from ..services import geo
@@ -43,8 +43,10 @@ def _can_view(req: DamageRequest, user: User, ws: Workshop | None) -> bool:
         return False
     if any(q.workshop_id == ws.id for q in req.quotes):
         return True
+    if ws.verification_status != VerificationStatus.approved:
+        return False
     d = geo.haversine_km(ws.lat, ws.lng, req.lat, req.lng)
-    return req.status == RequestStatus.open and d <= max(req.search_radius_km, ws.service_radius_km)
+    return req.status == RequestStatus.open and d <= min(req.search_radius_km, ws.service_radius_km)
 
 
 @router.post("", response_model=RequestOut, status_code=201)
@@ -53,14 +55,14 @@ def create_request(
     photos: list[UploadFile] = File(...),
     lat: float = Form(..., ge=-90, le=90),
     lng: float = Form(..., ge=-180, le=180),
-    city: str | None = Form(None),
-    country_code: str | None = Form(None),
-    car_make: str | None = Form(None),
-    car_model: str | None = Form(None),
+    city: str | None = Form(None, max_length=80),
+    country_code: str | None = Form(None, pattern="^[A-Za-z]{2}$"),
+    car_make: str | None = Form(None, max_length=60),
+    car_model: str | None = Form(None, max_length=60),
     car_year: int | None = Form(None, ge=1950, le=2100),
-    car_color: str | None = Form(None),
+    car_color: str | None = Form(None, max_length=40),
     description: str | None = Form(None, max_length=2000),
-    customer_offer: Decimal | None = Form(None, gt=0),
+    customer_offer: Decimal | None = Form(None, gt=0, max_digits=12, decimal_places=2),
     search_radius_km: float | None = Form(None, gt=0, le=200),
     user: User = Depends(require_customer),
     db: Session = Depends(get_db),
@@ -102,7 +104,7 @@ def my_requests(user: User = Depends(require_customer), db: Session = Depends(ge
 
 @router.get("/feed", response_model=list[RequestCard])
 def workshop_feed(
-    ws: Workshop = Depends(require_workshop),
+    ws: Workshop = Depends(require_verified_workshop),
     db: Session = Depends(get_db),
     severity: str | None = Query(None, pattern="^(minor|moderate|severe)$"),
     damage_type: str | None = None,

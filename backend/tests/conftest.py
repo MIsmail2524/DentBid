@@ -11,19 +11,31 @@ os.environ["DATABASE_URL"] = f"sqlite:///{_tmp}/test.db"
 os.environ["MEDIA_DIR"] = f"{_tmp}/media"
 os.environ["DENTBID_DAMAGE_WEIGHTS"] = ""
 os.environ["JWT_SECRET"] = "test-secret-that-is-long-enough-for-hs256"
+os.environ["PRIVATE_MEDIA_DIR"] = f"{_tmp}/private"
+os.environ["ADMIN_EMAIL"] = "admin@test.dev"
+os.environ["ADMIN_PASSWORD"] = "admin-password-123"
+os.environ["WEB_DIST_DIR"] = f"{_tmp}/dist"
 
 from fastapi.testclient import TestClient  # noqa: E402
 
 from app.db import Base, engine  # noqa: E402
 from app.main import app  # noqa: E402
+from app.services.ratelimit import limiter  # noqa: E402
 
 
 @pytest.fixture()
 def client():
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
-    with TestClient(app) as c:
+    limiter.reset()
+    with TestClient(app) as c:  # lifespan creates the admin
         yield c
+
+
+def admin_headers(client):
+    r = client.post("/api/auth/login", json={"email": "admin@test.dev", "password": "admin-password-123"})
+    assert r.status_code == 200, r.text
+    return {"Authorization": f"Bearer {r.json()['access_token']}"}
 
 
 def jpeg_bytes(w=1280, h=720) -> bytes:

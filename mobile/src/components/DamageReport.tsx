@@ -3,14 +3,10 @@ import { useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { TKey, useLocale } from '../i18n';
+import { absoluteUrl } from '../lib/config';
 import type { Damage, DamageRequest, Photo } from '../lib/types';
 import { severityColor, useTheme } from './theme';
 import { Badge, Card, Chip, H2, P, Row, SeverityBadge, Stat } from './ui';
-
-function depthLabel(d: number | null): TKey | null {
-  if (d == null) return null;
-  return d < 0.35 ? 'depth_shallow' : d < 0.65 ? 'depth_medium' : 'depth_deep';
-}
 
 export function PhotoViewer({ photos }: { photos: Photo[] }) {
   const t = useTheme();
@@ -20,7 +16,7 @@ export function PhotoViewer({ photos }: { photos: Photo[] }) {
   const photo = photos[index];
   if (!photo) return null;
   const hasMarked = !!photo.annotated_url;
-  const uri = marked && hasMarked ? photo.annotated_url! : photo.url;
+  const uri = absoluteUrl(marked && hasMarked ? photo.annotated_url : photo.url) ?? '';
   const ratio = photo.width && photo.height ? photo.width / photo.height : 4 / 3;
   return (
     <View style={{ gap: 8 }}>
@@ -39,7 +35,7 @@ export function PhotoViewer({ photos }: { photos: Photo[] }) {
           {photos.map((p, i) => (
             <Pressable key={p.id} onPress={() => setIndex(i)} accessibilityRole="button"
               style={{ borderWidth: 2, borderColor: i === index ? t.primary : 'transparent', borderRadius: 10 }}>
-              <Image source={{ uri: p.annotated_url ?? p.url }} style={{ width: 72, height: 54, borderRadius: 8 }} />
+              <Image source={{ uri: absoluteUrl(p.annotated_url ?? p.url) ?? '' }} style={{ width: 72, height: 54, borderRadius: 8 }} />
             </Pressable>
           ))}
         </ScrollView>
@@ -59,8 +55,6 @@ function DamageItem({ d }: { d: Damage }) {
     stats.push([tr('size'), `${m.width_cm.toFixed(0)} × ${m.height_cm.toFixed(0)} cm`]);
   }
   if (m.area_cm2 != null) stats.push([tr('area'), `${m.area_cm2.toFixed(0)} cm²`]);
-  const dl = depthLabel(m.depth_index);
-  if (dl) stats.push([tr('depth'), tr(dl)]);
   if (m.paint_layer) stats.push([tr('paint_layer'), tr(`layer_${m.paint_layer}` as TKey)]);
   stats.push([tr('confidence'), `${Math.round(d.confidence * 100)}%`]);
 

@@ -4,10 +4,11 @@ import { View } from 'react-native';
 
 import { useTheme } from '../components/theme';
 import { Button, Card, Chip, ErrorText, Field, H2, P, Row, Screen } from '../components/ui';
+import { DocumentsCard, VerificationBanner } from '../components/Verification';
 import { TKey, useLocale } from '../i18n';
 import { api, ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
-import type { DamageType } from '../lib/types';
+import type { DamageType, Workshop } from '../lib/types';
 
 const SERVICES: DamageType[] = ['dent', 'scratch', 'crack', 'glass_shatter', 'lamp_broken', 'tire_flat'];
 const RADII = [10, 25, 50, 100];
@@ -25,11 +26,13 @@ export default function WorkshopSetup() {
   const [services, setServices] = useState<DamageType[]>(['dent', 'scratch']);
   const [radius, setRadius] = useState(25);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [existing, setExisting] = useState<Workshop | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
 
   useEffect(() => {
     api.myWorkshop().then((w) => {
+      setExisting(w);
       setName(w.name); setPhone(w.phone ?? ''); setAddress(w.address ?? ''); setCity(w.city ?? '');
       setAbout(w.about ?? ''); setServices(w.services); setRadius(w.service_radius_km); setCoords({ lat: w.lat, lng: w.lng });
     }).catch((e) => {
@@ -65,7 +68,8 @@ export default function WorkshopSetup() {
         service_radius_km: radius, services, about: about.trim() || null,
       });
       await refresh();
-      router.replace('/workshop');
+      if (existing) router.replace('/workshop');
+      else setExisting(await api.myWorkshop());
     } catch (e) {
       setError(e);
     } finally {
@@ -77,6 +81,7 @@ export default function WorkshopSetup() {
     <Screen>
       <Stack.Screen options={{ title: tr('setup_title') }} />
       <P muted>{tr('setup_sub')}</P>
+      {existing && <VerificationBanner status={existing.verification_status} reason={existing.rejection_reason} />}
       <Card>
         <Field label={tr('shop_name')} value={name} onChangeText={setName} />
         <Field label={tr('phone')} value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
@@ -97,6 +102,7 @@ export default function WorkshopSetup() {
         <P muted>{tr('service_radius')}</P>
         <Row wrap>{RADII.map((r) => <Chip key={r} label={tr('km', { n: r })} active={radius === r} onPress={() => setRadius(r)} />)}</Row>
       </Card>
+      {existing && <DocumentsCard />}
       <ErrorText error={error} />
       <View>
         <Button title={tr('save')} loading={busy} disabled={name.trim().length < 2 || !coords} onPress={save} />

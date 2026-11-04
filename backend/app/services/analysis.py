@@ -56,7 +56,8 @@ def analyzer_status() -> dict:
 
 def matching_workshops(db, req: DamageRequest) -> list[tuple[Workshop, float]]:
     lat1, lat2, lng1, lng2 = geo.bounding_box(req.lat, req.lng, req.search_radius_km)
-    cands = db.query(Workshop).filter(Workshop.lat.between(lat1, lat2), Workshop.lng.between(lng1, lng2)).all()
+    cands = db.query(Workshop).filter(Workshop.verified.is_(True),
+                                      Workshop.lat.between(lat1, lat2), Workshop.lng.between(lng1, lng2)).all()
     types = set((req.analysis or {}).get("damage_types") or [])
     out = []
     for w in cands:
@@ -93,7 +94,7 @@ def run_analysis(request_id: int) -> None:
                 r = analyzer.analyze(img)
             except Exception as e:
                 log.exception("analysis failed for photo %s", photo.id)
-                photo.analysis = {"error": str(e), "quality": check_quality(img).__dict__}
+                photo.analysis = {"error": "analysis_failed", "quality": check_quality(img).__dict__}
                 continue
             results.append(r)
             ann_rel = photo.path.rsplit(".", 1)[0] + "_annotated.jpg"
@@ -102,7 +103,7 @@ def run_analysis(request_id: int) -> None:
             photo.analysis = r.to_dict()
 
         if analyzer is None:
-            req.analysis = {"status": "unavailable", "reason": _analyzer_error,
+            req.analysis = {"status": "unavailable",
                             "photos_analyzed": 0, "damage_types": []}
         else:
             report = summarize_report(results)

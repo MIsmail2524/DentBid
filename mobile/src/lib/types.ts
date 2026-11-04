@@ -14,6 +14,49 @@ export interface User {
   currency: string | null;
   language: string | null;
   has_workshop: boolean;
+  workshop_status: VerificationStatus | null;
+}
+
+export type VerificationStatus = 'pending' | 'approved' | 'rejected' | 'suspended';
+
+export interface WorkshopDocument {
+  id: number;
+  kind: 'shop_front' | 'trade_license' | 'owner_id' | 'other';
+  url: string;
+  created_at: string;
+}
+
+export interface AdminWorkshop extends Workshop {
+  owner_id: number;
+  owner_name: string;
+  owner_email: string;
+  owner_phone: string | null;
+  owner_active: boolean;
+  document_count: number;
+  created_at: string;
+  verified_at: string | null;
+  documents: WorkshopDocument[];
+}
+
+export interface AdminUser {
+  id: number;
+  role: Role;
+  name: string;
+  email: string;
+  phone: string | null;
+  country_code: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface AdminStats {
+  users: Record<string, number>;
+  workshops: Record<string, number>;
+  requests: Record<string, number>;
+  quotes_total: number;
+  jobs_booked: number;
+  open_requests: number;
+  analyzer: { available: boolean; model_version: string | null; error: string | null };
 }
 
 export interface LocaleInfo {
@@ -39,6 +82,8 @@ export interface Workshop {
   services: DamageType[];
   about: string | null;
   verified: boolean;
+  verification_status: VerificationStatus;
+  rejection_reason: string | null;
   rating_avg: number;
   rating_count: number;
   jobs_completed: number;
@@ -64,12 +109,12 @@ export interface Measurements {
   area_px: number;
   area_ratio_part: number | null;
   area_ratio_car: number | null;
+  area_ratio_image: number;
   width_cm: number | null;
   height_cm: number | null;
   area_cm2: number | null;
   length_cm: number | null;
   mean_width_cm: number | null;
-  depth_index: number | null;
   paint_contrast: number | null;
   paint_layer: 'clear_coat' | 'base_coat' | 'primer_or_metal' | null;
   scale_source: string | null;

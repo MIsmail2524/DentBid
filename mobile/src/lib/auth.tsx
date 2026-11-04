@@ -49,6 +49,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })();
   }, [start]);
 
+  // stable identity: screens call this from focus effects, so it must not change on every user update
+  const refresh = useCallback(async () => setUser(await api.me()), []);
+
   const value = useMemo<AuthCtx>(() => ({
     user,
     loading,
@@ -72,9 +75,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       connectRealtime(null);
       setUser(null);
     },
-    refresh: async () => setUser(await api.me()),
+    refresh,
     setUser,
-  }), [user, loading, start]);
+  }), [user, loading, start, refresh]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

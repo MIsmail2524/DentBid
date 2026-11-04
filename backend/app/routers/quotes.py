@@ -4,7 +4,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..deps import get_current_user, require_customer, require_workshop
+from ..deps import get_current_user, require_customer, require_verified_workshop, require_workshop
 from ..models import DamageRequest, Message, Quote, QuoteStatus, RequestStatus, Role, User, Workshop
 from ..schemas import CounterIn, MessageIn, MessageOut, QuoteIn, QuoteOut, RequestCard
 from ..serializers import quote_out, refresh_expiry, request_card
@@ -51,13 +51,13 @@ def _book(db: Session, req: DamageRequest, winner: Quote) -> list[User]:
 
 @router.post("/requests/{request_id}/quotes", response_model=QuoteOut, status_code=201)
 def submit_quote(request_id: int, data: QuoteIn, background: BackgroundTasks,
-                 ws: Workshop = Depends(require_workshop), db: Session = Depends(get_db)):
+                 ws: Workshop = Depends(require_verified_workshop), db: Session = Depends(get_db)):
     """Create or revise this workshop's quote for a request."""
     req = _request(db, request_id)
     if req.status != RequestStatus.open:
         raise HTTPException(409, "This request is not accepting quotes")
     d = geo.haversine_km(ws.lat, ws.lng, req.lat, req.lng)
-    if d > max(req.search_radius_km, ws.service_radius_km):
+    if d > min(req.search_radius_km, ws.service_radius_km):
         raise HTTPException(403, "Request is outside your service area")
 
     q = db.query(Quote).filter(Quote.request_id == req.id, Quote.workshop_id == ws.id).one_or_none()
@@ -115,6 +115,8 @@ def accept_quote(quote_id: int, background: BackgroundTasks,
         raise HTTPException(404, "Quote not found")
     if q.status not in (QuoteStatus.pending, QuoteStatus.countered):
         raise HTTPException(409, f"Quote is {q.status.value}")
+    if not q.workshop.verified:
+        raise HTTPException(409, "This workshop is not verified any more")
     if q.status == QuoteStatus.countered:
         # customer drops their counter and takes the workshop's price
         q.counter_amount = None
@@ -149,7 +151,7 @@ def counter_quote(quote_id: int, data: CounterIn, background: BackgroundTasks,
 
 @router.post("/quotes/{quote_id}/accept-counter", response_model=QuoteOut)
 def accept_counter(quote_id: int, background: BackgroundTasks,
-                   ws: Workshop = Depends(require_workshop), db: Session = Depends(get_db)):
+                   ws: Workshop = Depends(require_verified_workshop), db: Session = Depends(get_db)):
     """Workshop agrees to the customer's price: the job is booked immediately."""
     q = _quote(db, quote_id)
     if q.workshop_id != ws.id:

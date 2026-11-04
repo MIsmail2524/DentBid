@@ -8,7 +8,9 @@ router = APIRouter(tags=["meta"])
 
 @router.get("/health")
 def health():
-    return {"status": "ok", "analyzer": analyzer_status()}
+    # public: no error strings or file paths (admins see details at /api/admin/stats)
+    st = analyzer_status()
+    return {"status": "ok", "analyzer": {"available": st["available"], "model_version": st["model_version"]}}
 
 
 @router.get("/locale")
