@@ -1,9 +1,11 @@
+# One command:  docker compose up --build     then open http://localhost:8000
+# The admin login is printed in the logs:  docker compose logs api | grep "DentBid admin"
 services:
   db:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: dentbid
-      POSTGRES_PASSWORD: dentbid
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dentbid}
       POSTGRES_DB: dentbid
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -11,26 +13,29 @@ services:
       test: ["CMD-SHELL", "pg_isready -U dentbid"]
       interval: 5s
       retries: 10
+    restart: unless-stopped
 
   api:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    env_file:
-      - path: backend/.env
-        required: false
     environment:
-      DATABASE_URL: postgresql+psycopg://dentbid:dentbid@db:5432/dentbid
-      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8000}
+      DATABASE_URL: postgresql+psycopg://dentbid:${POSTGRES_PASSWORD:-dentbid}@db:5432/dentbid
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@dentbid.app}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
     volumes:
-      - media:/data/media
+      - data:/data
       - ./ml/weights:/srv/ml/weights:ro
     ports:
       - "8000:8000"
     depends_on:
       db:
         condition: service_healthy
+    restart: unless-stopped
 
 volumes:
   pgdata:
-  media:
+  data:

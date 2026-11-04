@@ -17,6 +17,7 @@ ml/runs/
 ml/weights/*.pt
 ml/weights/*.onnx
 backend/media/
+backend/private_media/
 *.db
 
 # Node / Expo

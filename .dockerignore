@@ -4,7 +4,11 @@
 **/.pytest_cache
 ml/datasets
 ml/runs
-mobile
+mobile/node_modules
+mobile/dist
+mobile/.expo
 backend/media
 *.db
 .git
+backend/.env
+backend/private_media

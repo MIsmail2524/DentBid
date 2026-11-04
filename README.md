@@ -10,7 +10,7 @@ One codebase runs on **Android, iOS and the web**.
 2. **CV engine** segments the damage (dent, scratch, crack, shattered glass, broken lamp, flat tire), finds which panel it is on, and estimates:
    - size in cm (scaled from the known size of the detected panel)
    - scratch length and paint depth (clear coat, colour coat, or primer/bare metal)
-   - dent depth, from reflection distortion
+   - dent size (depth is left to the workshop: it cannot be judged reliably from one photo)
    - a severity score from 0 to 100 (minor, moderate or severe), a suggested repair method and a labour estimate
 3. **Workshops** inside the service radius get a notification. They see the annotated photos and the report, then quote a price, a turnaround time and a warranty.
 4. **Customer** compares quotes by price, rating and distance, then accepts one or sends a counter offer. The workshop's phone number and location are only revealed after booking.
@@ -26,51 +26,86 @@ One codebase runs on **Android, iOS and the web**.
 | [`backend/`](backend) | FastAPI + PostgreSQL API: auth, requests, background AI analysis, bidding, chat, WebSocket and push notifications |
 | [`mobile/`](mobile) | Expo (React Native) app for Android, iOS and web |
 
-## Quick start
+## Run it (one command)
 
-### 1. Train the models (once, on a free GPU)
+```bash
+./dentbid.sh
+```
 
-Open [`ml/notebooks/train_colab.ipynb`](ml/notebooks/train_colab.ipynb) in Google Colab, then put the resulting `damage.pt` and `parts.pt` in `ml/weights/`. See [ml/README.md](ml/README.md) for details.
+The script installs everything that is missing, generates secrets in `backend/.env`, builds the web app and starts the server. Then open **http://localhost:8000**.
 
-The app also runs without weights. In that case workshops quote from the photos alone, without the AI report.
+- The terminal prints the admin login, which is also stored in `backend/.env`.
+- Phones on the same Wi-Fi can use the LAN address the script prints.
+- You need Python 3.10+ and Node.js 18+.
+- `./dentbid.sh --rebuild` forces a fresh web build. `PORT=9000 ./dentbid.sh` changes the port.
 
-### 2. Backend
-
-With Docker:
+With Docker instead (PostgreSQL included):
 
 ```bash
 docker compose up --build
+docker compose logs api | grep "DentBid admin"
 ```
 
-Or locally with SQLite:
+### Add the AI model
+
+Train on a GPU server, then copy `damage.pt` and `parts.pt` into `ml/weights/` and rerun `./dentbid.sh`:
 
 ```bash
-cd backend
-python -m venv .venv && .venv/bin/pip install -r requirements-dev.txt -e "../ml[yolo]"
-cp .env.example .env
-.venv/bin/uvicorn app.main:app --reload --host 0.0.0.0
+bash ml/scripts/gpu_train.sh
 ```
 
-The API docs are at http://localhost:8000/docs.
+The script downloads the CarDD dataset and trains both models. See [ml/README.md](ml/README.md). Until the weights are present, workshops quote from the photos alone.
 
-### 3. App
+### Mobile app (Android / iOS)
 
 ```bash
-cd mobile
-npm install
-npx expo start
+cd mobile && npx expo start
 ```
 
-- Press `w` for the web app, or scan the QR code with Expo Go.
-- In development the app reaches the API on your computer's LAN IP, port 8000.
-- For a deployed API, set `EXPO_PUBLIC_API_URL`.
-- Push notifications need a development build: `npx eas-cli build --profile development`.
+Scan the QR code with Expo Go. For production builds, set `EXPO_PUBLIC_API_URL` and run `npx eas-cli build`.
+
+## Admin panel
+
+Log in with the admin account at http://localhost:8000.
+
+- **Verification:** the queue of workshops waiting for approval, plus platform stats and the AI model status.
+- **Workshop review:** shop details, a map link, and the private verification documents. Approve, reject with a reason the shop sees, or suspend.
+- **Workshops** and **Users:** search everything, and disable or enable accounts. Disabling signs the user out everywhere.
+- Every admin decision is recorded in an audit log (`/api/admin/audit`).
+
+New workshops must be **approved before they can see jobs or send quotes**. Moving the shop more than 1 km or renaming it sends it back for review. Suspending a shop withdraws its open quotes.
+
+## Security
+
+Each of these attacks has an automated test in [`backend/tests/test_admin_security.py`](backend/tests/test_admin_security.py):
+
+| Attack | Defence |
+|---|---|
+| Forged JWT (`alg=none`, wrong key, expired, tampered) | single pinned algorithm; required claims; `token_version` so tokens can be revoked (logout everywhere, account disabled) |
+| Password brute force | 10 attempts per 15 min per IP+email, 50 per IP; bcrypt |
+| User enumeration via login | same message, and a dummy bcrypt run when the email does not exist |
+| Self-promotion to admin at registration | role is limited to customer or workshop |
+| IDOR on requests, quotes, chat, documents | every object is checked against its owner (tested with a second customer and a second workshop) |
+| Unverified, suspended or far-away workshops | blocked from the feed, from quoting and from viewing requests |
+| Malicious uploads (SVG/HTML, GIF, polyglot JPEG, decompression bomb, oversized) | format allow-list, pixel limit, size limit, then re-encoding to JPEG, which strips EXIF/GPS and hidden payloads |
+| Photo URL guessing or sharing | media is served only through HMAC-signed, expiring URLs; verification documents need the owner's or an admin's token |
+| Path traversal | every file path is resolved inside its root folder; the web-app fallback never serves files outside `dist/` |
+| Huge requests | 130 MB body limit, including chunked uploads |
+| Request flooding | rate limit per IP on the whole API |
+| Token in WebSocket URL or logs | the socket authenticates with its first message instead |
+| SQL injection | ORM parameters, with LIKE wildcards escaped in admin search |
+| Clickjacking, MIME sniffing, info leaks | security headers and CSP; `/health` shows no internals; `ENVIRONMENT=production` refuses weak secrets and hides `/docs` |
+
+Before going public, also:
+- put the server behind HTTPS (for example Caddy or Nginx);
+- set `ENVIRONMENT=production` and `CORS_ORIGINS` to your domain;
+- move the rate limiter to Redis if you run more than one API process.
 
 ## Tests
 
 ```bash
 cd ml && pytest -q
-cd backend && pytest -q
+cd backend && pytest -q        # includes the attack tests
 cd mobile && npx tsc --noEmit
 ```
 
